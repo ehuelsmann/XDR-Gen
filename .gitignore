@@ -44,3 +44,6 @@ inc/
 /*.data
 /*.pl
 /test*
+/devel/
+/.plx/
+/XDR-Gen-*

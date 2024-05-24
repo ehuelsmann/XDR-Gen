@@ -1,0 +1,18 @@
+#!/usr/bin/env perl
+
+use v5.14;
+use warnings;
+
+use JSON::PP;
+use XDR::Gen;
+
+
+my $decoder = JSON::PP->new;
+my $json = do { local $/ = undef; <STDIN> };
+my $ast = $decoder->decode( $json );
+
+STDOUT->autoflush(1);
+STDERR->autoflush(1);
+XDR::Gen->generate( $ast, undef, external_constants => { VIR_UUID_BUFLEN => 16 } );
+
+exit 0;
