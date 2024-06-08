@@ -1221,7 +1221,7 @@ sub generate {
 
     $cb->( undef, <<~'SERIAL', type => 'preamble' );
     use v5.14;
-    use warnings FATAL => 'undefined';
+    use warnings FATAL => 'uninitialized';
     use Config;
     use Carp qw(croak);
     SERIAL
