@@ -1265,12 +1265,16 @@ in a serializer and a deserializer function.  For defined constants and the
 elements of enums, constants are defined.
 
 The generated conversion routines include validation of input coming from
-encoded input (in case of deserialization) or coming from
+encoded input (in case of deserialization) or from the enclosing application
+(in case of serialization).
 
 =head2 Data conversion
 
 Except for data passed to a 'pointer' type (defined using C<*>) or boolean
-values, all values provided must be defined.
+values, all values provided must be defined.  In case of boolean values, an
+undefined value will be interpreted to indicate C<false>.  In case of a
+pointer type, an undefined value will be serialized as "not provided", the
+same way a C C<NULL> pointer would have.
 
 =head1 FUNCTIONS
 
@@ -1303,17 +1307,41 @@ source code having been generated.  C<$type> can have these values:
 
 =over 8
 
+=item * preamble
+
+Code fragment to preceed the generated code. Defaults to
+
+    use v5.14;
+    use warnings FATAL => 'uninitialized';
+    use Config;
+    use Carp qw(croak);
+
+If it's the intent to use the generated code as a stand-alone module,
+at the absolute minimum, a C<package> statement needs to be prepended
+and a closing C<1;> module end appended.
+
 =item * constant
+
+A constant generated from a C<const> line in the input.
 
 =item * enum
 
+A value from an C<enum> definition; note that this definition may be
+part of a nested enum specification inside a struct or union definition.
+
 =item * serializer
+
+Code generated to serialize a type specified in the XDR syntax.
 
 =item * deserializer
 
+Code generated to deserialize a type specified in the XDR syntax.
+
 =back
 
-Note that the C<$node> does not need to be a top-level AST node.
+Note that the C<$node> does not need to be a top-level AST node,
+especially with enum types, which can be defined 'inline' as part
+of union or struct
 
 =item * A scalar reference
 
@@ -1371,8 +1399,8 @@ Emit preprocessor instructions (as-is).
 A hashref with constants defined outside of the scope of the xdr input
 file.  C<rpcgen> depends on C<cpp> to resolve preprocessor macros; XDR::Gen
 does not, but allows values extracted by other means to be provided for use
-during code generation.  Note that code generation only needs constants in
-highly exceptional cases only; constants I<may> still be required at runtime.
+during code generation or in the generated code.  External constants are
+resolved to their numeric value at code generation time by XDR::Gen.
 
 =back
 
