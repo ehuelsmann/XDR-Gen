@@ -435,7 +435,7 @@ sub _serializer_double {
 
 sub _deserializer_string {
     my ($ast_node, $value) = @_;
-    my $max = $ast_node->{max}->{content} // 4294967295;
+    my $max = _resolve_to_number($ast_node->{max}->{content} // 4294967295);
     _assert_value_var($value);
 
     return <<~SERIAL;
@@ -457,7 +457,7 @@ sub _deserializer_string {
 
 sub _serializer_string {
     my ($ast_node, $value) = @_;
-    my $max = $ast_node->{max}->{content} // 4294967295;
+    my $max = _resolve_to_number($ast_node->{max}->{content} // 4294967295);
     _assert_value_var($value);
 
     return <<~SERIAL;
@@ -487,7 +487,7 @@ sub _deserializer_opaque {
     _assert_value_var($value);
 
     if ($variable_length) {
-        my $max = $ast_node->{max}->{content} // 4294967295;
+        my $max = _resolve_to_number($ast_node->{max}->{content} // 4294967295);
 
         return <<~SERIAL;
         # my (\$class, \$value, \$index, \$input) = \@_;
@@ -526,7 +526,7 @@ sub _serializer_opaque {
     _assert_value_var($value);
 
     if ($variable_length) {
-        my $max = $ast_node->{max}->{content} // 4294967295;
+        my $max = _resolve_to_number($ast_node->{max}->{content} // 4294967295);
 
         return <<~SERIAL;
         # my (\$class, \$value, \$index, \$output) = \@_;
@@ -619,7 +619,7 @@ sub _deserializer_array {
     my $iter_var = _var( '$i' );
     my $c = _indent( _indent( _deserializer_type( $decl, $value . "->[$iter_var\]" ) ) );
     if ($decl->{variable}) {
-        my $max = $ast_node->{max}->{content} // 4294967295;
+        my $max = _resolve_to_number( $ast_node->{max}->{content} // 4294967295 );
 
         return <<~SERIAL;
         # my (\$class, \$value, \$index, \$input) = \@_;
@@ -639,7 +639,7 @@ sub _deserializer_array {
         SERIAL
     }
     else { # fixed length
-        my $count = $ast_node->{count}->{content};
+        my $count = _resolve_to_number( $ast_node->{count}->{content} );
 
         return <<~SERIAL;
         # my (\$class, \$value, \$index, \$input) = \@_;
@@ -661,7 +661,7 @@ sub _serializer_array {
     my $iter_var = _var( '$i' );
     my $c = _indent( _indent( _serializer_type( $decl, $value . "->[$iter_var\]" ) ) );
     if ($decl->{variable}) {
-        my $max = $ast_node->{max}->{content} // 4294967295;
+        my $max = _resolve_to_number( $ast_node->{max}->{content} // 4294967295 );
 
         return <<~SERIAL;
         # my (\$class, \$value, \$index, \$output) = \@_;
@@ -681,7 +681,7 @@ sub _serializer_array {
         SERIAL
     }
     else { # fixed length
-        my $count = $ast_node->{count}->{content};
+        my $count = _resolve_to_number( $ast_node->{count}->{content} );
         return <<~SERIAL;
         # my (\$class, \$value, \$index, \$output) = \@_;
         croak "Missing required input 'array' value"
