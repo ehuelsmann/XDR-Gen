@@ -553,6 +553,7 @@ sub _serializer_opaque {
         my $pad = (4 - ($count % 4)) % 4;
         my $padstr = "\\0" x $pad;
         my $padcode = $pad ? <<~PAD : '';
+
             substr( \$_[3], \$_[2] ) = "$padstr";
             \$_[2] += $pad;
         PAD
@@ -566,8 +567,7 @@ sub _serializer_opaque {
                 if not \$len  == $count;
 
             substr( \$_[3], \$_[2] ) = $value;
-            \$_[2] += \$len;
-            $padcode
+            \$_[2] += \$len;$padcode
         };
         SERIAL
     }
