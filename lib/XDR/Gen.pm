@@ -65,7 +65,7 @@ sub _resolve_to_number {
     elsif ($datum =~ m/^-?\d+$/) {
         return $datum;
     }
-    die "Value '$datum' does not resolve to a number";
+    croak "Value '$datum' does not resolve to a number";
 }
 
 sub _var {
@@ -912,7 +912,7 @@ sub _deserializer_type {
             return $d->($node, $value);
         }
         else {
-            print "help!\n";
+            croak "Unknown primitive type: $decl_type->{name}";
         }
     }
     elsif ($spec eq 'named') {
@@ -928,9 +928,9 @@ sub _deserializer_type {
         return _deserializer_union( $decl_type->{declaration}, $value );
     }
     else {
-        print $node->{def} . "\n";
+        croak "Unknown complex type: $spec";
     }
-    "ERROR";
+    # unreachable
 }
 
 sub _serializer_type {
@@ -945,7 +945,7 @@ sub _serializer_type {
             return $s->($node, $value);
         }
         else {
-            print "HELP!\n";
+            croak "Unknown primitive type: $decl_type->{name}";
         }
     }
     elsif ($spec eq 'named') {
@@ -961,9 +961,9 @@ sub _serializer_type {
         return _serializer_union( $decl_type->{declaration}, $value );
     }
     else {
-        print $node->{def} . "\n";
+        croak "Unknown complex type: $spec";
     }
-    "ERROR";
+    # unreachable
 }
 
 sub _deserializer_pointer {
