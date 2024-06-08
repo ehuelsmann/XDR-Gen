@@ -1228,6 +1228,7 @@ sub generate {
     $class->_iterate_toplevel_nodes( $ast, $cb,
                                      transform => sub { $_[0] },
                                      %options );
+    $cb->( undef, '', type => 'postamble' );
 }
 
 
@@ -1318,7 +1319,14 @@ Code fragment to preceed the generated code. Defaults to
 
 If it's the intent to use the generated code as a stand-alone module,
 at the absolute minimum, a C<package> statement needs to be prepended
-and a closing C<1;> module end appended.
+to the preamble.
+
+=item * postamble
+
+Code fragment to follow the generated code. Default to an empty string.
+If it's the intent to use the generated code as a stand-alone module,
+at the absolute minimum, a C<1;> statement should be appended to this
+postamble.
 
 =item * constant
 
