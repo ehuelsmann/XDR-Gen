@@ -586,8 +586,8 @@ sub _serializer_void {
 }
 
 sub _deserializer_named {
-    my ($ast_node, $value) = @_;
-    my $ref  = $ast_node->{type}->{name}->{content};
+    my ($ast_node, $value, %args) = @_;
+    my $ref  = $args{transform}->($ast_node->{type}->{name}->{content});
     _assert_value_var($value);
 
     return <<~SERIAL;
@@ -597,8 +597,8 @@ sub _deserializer_named {
 }
 
 sub _serializer_named {
-    my ($ast_node, $value) = @_;
-    my $ref  = $ast_node->{type}->{name}->{content};
+    my ($ast_node, $value, %args) = @_;
+    my $ref  = $args{transform}->($ast_node->{type}->{name}->{content});
     _assert_value_var($value);
 
     return <<~SERIAL;
@@ -610,14 +610,15 @@ sub _serializer_named {
 }
 
 sub _deserializer_array {
-    my ($ast_node, $value) = @_;
+    my ($ast_node, $value, %args) = @_;
     my $decl = $ast_node;
     _assert_value_var($value);
 
     local $varnum = $varnum;
     my $len_var = _var( '$len' );
     my $iter_var = _var( '$i' );
-    my $c = _indent( _indent( _deserializer_type( $decl, $value . "->[$iter_var\]" ) ) );
+    my $c = _indent( _indent( _deserializer_type( $decl, $value . "->[$iter_var\]",
+                              %args ) ) );
     if ($decl->{variable}) {
         my $max = _resolve_to_number( $ast_node->{max}->{content} // 4294967295 );
 
@@ -652,14 +653,15 @@ sub _deserializer_array {
 }
 
 sub _serializer_array {
-    my ($ast_node, $value) = @_;
+    my ($ast_node, $value, %args) = @_;
     my $decl = $ast_node;
     _assert_value_var($value);
 
     local $varnum = $varnum;
     my $len_var = _var( '$len' );
     my $iter_var = _var( '$i' );
-    my $c = _indent( _indent( _serializer_type( $decl, $value . "->[$iter_var\]" ) ) );
+    my $c = _indent( _indent( _serializer_type( $decl, $value . "->[$iter_var\]",
+                                                %args ) ) );
     if ($decl->{variable}) {
         my $max = _resolve_to_number( $ast_node->{max}->{content} // 4294967295 );
 
@@ -747,7 +749,7 @@ sub _serializer_enum {
 }
 
 sub _deserializer_struct {
-    my ($node, $value) = @_;
+    my ($node, $value, %args) = @_;
     my $decl = $node;
     my @fragments = ("$value = {};");
     _assert_value_var($value);
@@ -758,13 +760,14 @@ sub _deserializer_struct {
         push @fragments, "# Deserializing field: '$name'";
         push @fragments, _deserializer_declaration(
             $member->{declaration},
-            $name ? $value . "->{$name}" : undef );
+            $name ? $value . "->{$name}" : undef,
+            %args );
     }
     return join("\n", @fragments);
 }
 
 sub _serializer_struct {
-    my ($node, $value) = @_;
+    my ($node, $value, %args) = @_;
     my $decl = $node;
     my @fragments = (<<~SERIAL);
     croak "Missing required input 'struct' value"
@@ -778,13 +781,14 @@ sub _serializer_struct {
         push @fragments, "# Serializing field: '$name'";
         push @fragments, _serializer_declaration(
             $member->{declaration},
-            $name ? $value . "->{$name}" : undef );
+            $name ? $value . "->{$name}" : undef,
+            %args );
     }
     return join("\n", @fragments);
 }
 
 sub _deserializer_union {
-    my ($node, $value) = @_;
+    my ($node, $value, %args) = @_;
     my $switch = $node;
     my @fragments = ("$value = {};");
     _assert_value_var($value);
@@ -797,7 +801,7 @@ sub _deserializer_union {
         push @fragments, (
             "my $var;",
             _deserializer_declaration( $switch->{discriminator}->{declaration},
-                                     $var ),
+                                     $var, %args ),
             "$value\->{$name} = $var;");
     };
     my $members = $switch->{members};
@@ -807,7 +811,8 @@ sub _deserializer_union {
         my $selector = $case->{value}->{content}; # "void" has no name
         my $c = _indent( _deserializer_declaration(
                              $case->{declaration},
-                             $name ? $value . "->{$name}" : undef ));
+                             $name ? $value . "->{$name}" : undef,
+                             %args ));
         push @fragments, <<~SERIAL;
         # Deserializing member '$name' (discriminator == $selector)
         $cond ($var == $selector) {
@@ -822,7 +827,8 @@ sub _deserializer_union {
         my $name = $default->{name}->{content} // ''; # "void" has no name
         my $c = _indent( _deserializer_declaration(
                              $decl,
-                             $name ? $value . "->{$name}" : undef ));
+                             $name ? $value . "->{$name}" : undef,
+                             %args ));
         push @fragments, <<~SERIAL;
         else {
             # Deserializing member '$name' (default discriminator)
@@ -842,7 +848,7 @@ sub _deserializer_union {
 }
 
 sub _serializer_union {
-    my ($node, $value) = @_;
+    my ($node, $value, %args) = @_;
     my $switch = $node;
     my @fragments = (<<~SERIAL);
     croak "Missing required input 'union' value"
@@ -857,7 +863,8 @@ sub _serializer_union {
         my $name = $switch->{discriminator}->{name}->{content};
         push @fragments, "my $var = $value\->{$name};";
         push @fragments, _serializer_declaration( $switch->{discriminator}->{declaration},
-                                                  $var );
+                                                  $var,
+                                                  %args );
     };
     my $members = $switch->{members};
     my $cond = 'if';
@@ -866,7 +873,8 @@ sub _serializer_union {
         my $selector = $case->{value}->{content};
         my $c = _indent( _serializer_declaration(
                              $case->{declaration},
-                             $name ? $value . "->{$name}" : undef ));
+                             $name ? $value . "->{$name}" : undef,
+                             %args ));
         push @fragments, <<~SERIAL;
         # Serializing member '$name' (discriminator == $selector)
         $cond ($var == $selector) {
@@ -881,7 +889,8 @@ sub _serializer_union {
         my $name = $default->{name}->{content} // ''; # "void" has no name
         my $c = _indent( _serializer_declaration(
                              $decl,
-                             $name ? $value . "->{$name}" : undef ));
+                             $name ? $value . "->{$name}" : undef,
+                             %args ));
         push @fragments, <<~SERIAL;
         else {
             # Serializing member '$name' (default discriminator)
@@ -901,7 +910,7 @@ sub _serializer_union {
 }
 
 sub _deserializer_type {
-    my ($node, $value) = @_;
+    my ($node, $value, %args) = @_;
     my $decl = $node;
     my $decl_type = $decl->{type};
     my $spec = $decl_type->{spec};
@@ -909,23 +918,23 @@ sub _deserializer_type {
     if ($spec eq 'primitive') {
         if (my $d = $deserializers{$decl_type->{name}}
             // $deserializers{$decl_type->{name}->{content}}) {
-            return $d->($node, $value);
+            return $d->($node, $value, %args);
         }
         else {
             croak "Unknown primitive type: $decl_type->{name}";
         }
     }
     elsif ($spec eq 'named') {
-        return _deserializer_named( $node, $value );
+        return _deserializer_named( $node, $value, %args );
     }
     elsif ($spec eq 'enum') {
-        return _deserializer_enum( $decl_type->{declaration}, $value );
+        return _deserializer_enum( $decl_type->{declaration}, $value, %args );
     }
     elsif ($spec eq 'struct') {
-        return _deserializer_struct( $decl_type->{declaration}, $value );
+        return _deserializer_struct( $decl_type->{declaration}, $value, %args );
     }
     elsif ($spec eq 'union') {
-        return _deserializer_union( $decl_type->{declaration}, $value );
+        return _deserializer_union( $decl_type->{declaration}, $value, %args );
     }
     else {
         croak "Unknown complex type: $spec";
@@ -934,7 +943,7 @@ sub _deserializer_type {
 }
 
 sub _serializer_type {
-    my ($node, $value) = @_;
+    my ($node, $value, %args) = @_;
     my $decl = $node;
     my $decl_type = $decl->{type};
     my $spec = $decl_type->{spec};
@@ -942,23 +951,23 @@ sub _serializer_type {
     if ($spec eq 'primitive') {
         if (my $s = $serializers{$decl_type->{name}}
             // $serializers{$decl_type->{name}->{content}}) {
-            return $s->($node, $value);
+            return $s->($node, $value, %args);
         }
         else {
             croak "Unknown primitive type: $decl_type->{name}";
         }
     }
     elsif ($spec eq 'named') {
-        return _serializer_named( $node, $value );
+        return _serializer_named( $node, $value, %args );
     }
     elsif ($spec eq 'enum') {
-        return _serializer_enum( $decl_type->{declaration}, $value );
+        return _serializer_enum( $decl_type->{declaration}, $value, %args );
     }
     elsif ($spec eq 'struct') {
-        return _serializer_struct( $decl_type->{declaration}, $value );
+        return _serializer_struct( $decl_type->{declaration}, $value, %args );
     }
     elsif ($spec eq 'union') {
-        return _serializer_union( $decl_type->{declaration}, $value );
+        return _serializer_union( $decl_type->{declaration}, $value, %args );
     }
     else {
         croak "Unknown complex type: $spec";
@@ -967,9 +976,9 @@ sub _serializer_type {
 }
 
 sub _deserializer_pointer {
-    my ($node, $value) = @_;
+    my ($node, $value,%args) = @_;
     my $decl = $node;
-    my $c = _indent( _indent(_deserializer_type( $node, $value )));
+    my $c = _indent( _indent(_deserializer_type( $node, $value, %args )));
     my $bool_var = _var('$b');
     my $b = _indent(_deserializer_bool( $node, $bool_var ));
 
@@ -989,9 +998,9 @@ sub _deserializer_pointer {
 }
 
 sub _serializer_pointer {
-    my ($node, $value) = @_;
+    my ($node, $value, %args) = @_;
     my $decl = $node;
-    my $c = _indent(_serializer_type( $node, $value ));
+    my $c = _indent(_serializer_type( $node, $value, %args ));
     my $c_false = _indent(_serializer_bool( $node, 0 ));
     my $c_true  = _indent(_serializer_bool( $node, 1 ));
 
@@ -1008,54 +1017,52 @@ sub _serializer_pointer {
 }
 
 sub _deserializer_declaration {
-    my ($decl, $value) = @_;
+    my ($decl, $value, %args) = @_;
 
     if ($decl->{pointer}) {
-        return _deserializer_pointer( $decl, $value );
+        return _deserializer_pointer( $decl, $value, %args );
     }
     elsif ($decl->{array}) {
-        return _deserializer_array( $decl, $value );
+        return _deserializer_array( $decl, $value, %args );
     }
 
-    return _deserializer_type( $decl, $value );
+    return _deserializer_type( $decl, $value, %args );
 }
 
 sub _serializer_declaration {
-    my ($decl, $value) = @_;
+    my ($decl, $value, %args) = @_;
 
     if ($decl->{pointer}) {
-        return _serializer_pointer( $decl, $value );
+        return _serializer_pointer( $decl, $value, %args );
     }
     elsif ($decl->{array}) {
-        return _serializer_array( $decl, $value );
+        return _serializer_array( $decl, $value, %args );
     }
 
-    return _serializer_type( $decl, $value );
+    return _serializer_type( $decl, $value, %args );
 }
 
 sub _deserializer_definition {
-    my ($node) = @_;
+    my ($node, %args) = @_;
 
     local $varnum = $varnum;
-    my $name = $node->{name}->{content};
-    my $c = _indent( _deserializer_declaration( $node->{definition}, '$_[1]' ) );
+    my $name = $args{transform}->( $node->{name}->{content} );
+    my $c = _indent( _deserializer_declaration( $node->{definition}, '$_[1]', %args ) );
     return <<~SERIAL;
     # \@_: (\$class, \$value, \$index, \$input) = \@_;
     sub deserialize_$name {
         my \$input_length = length \$_[3];
         $c
-        die "Too much input provided: \$input_length, consumed \$_[2]"
-            if \$_[2] < \$input_length;
     }
     SERIAL
 }
 
 sub _serializer_definition {
-    my ($node) = @_;
+    my ($node, %args) = @_;
 
     local $varnum = $varnum;
-    my $name = $node->{name}->{content};
-    my $c = _indent( _serializer_declaration( $node->{definition}, '$_[1]' ) );
+    my $name = $args{transform}->( $node->{name}->{content} );
+    my $c = _indent( _serializer_declaration( $node->{definition}, '$_[1]', %args ) );
     return <<~SERIAL;
     # \@_: (\$class, \$value, \$index, \$output) = \@_;
     sub serialize_$name {
@@ -1065,9 +1072,9 @@ sub _serializer_definition {
 }
 
 sub _define_constant {
-    my ($node) = @_;
+    my ($node, %args) = @_;
 
-    my $name = $node->{name}->{content};
+    my $name = $args{transform}->( $node->{name}->{content} );
     my $value = $node->{value}->{content};
     my $resolved = _resolve_to_number( $value );
     return <<~SERIAL;
@@ -1078,7 +1085,7 @@ sub _define_constant {
 our @nesting;
 
 sub _define_enum {
-    my ($node) = @_;
+    my ($node, %args) = @_;
     my $name = $node->{name}->{content} // join('.', @nesting);
     my $elements = $node->{type}->{declaration}->{elements};
 
@@ -1086,11 +1093,11 @@ sub _define_enum {
         "# Define elements from enum '$name'",
         "use constant {",
         );
-    my $w = max map { length $_->{name}->{content} } @{ $elements };
+    my $w = max map { length $args{transform}->($_->{name}->{content}) } @{ $elements };
     for my $element (@{ $elements }) {
         _add_constant( $element );
         push @fragments, sprintf("    %-${w}s => %s,",
-                                 $element->{name}->{content},
+                                 $args{transform}->($element->{name}->{content}),
                                  $element->{value}->{content});
     }
     push @fragments, "};";
@@ -1098,7 +1105,7 @@ sub _define_enum {
 }
 
 sub _serializer_nested_enums {
-    my ($cb, $node) = @_;
+    my ($cb, $node, %args) = @_;
     my $decl = $node->{type}->{declaration};
 
     if ($node->{type}->{spec} eq 'union') {
@@ -1107,17 +1114,17 @@ sub _serializer_nested_enums {
 
             local @nesting = (@nesting,
                               $discriminator->{name}->{content});
-            _serializer_nested_enums( $cb, $discriminator->{declaration} );
+            _serializer_nested_enums( $cb, $discriminator->{declaration}, %args );
         };
         my $members = $decl->{members};
         for my $case (@{ $members->{cases} }) {
             local @nesting = (@nesting, $case->{name}->{content});
-            _serializer_nested_enums( $cb, $case->{declaration} );
+            _serializer_nested_enums( $cb, $case->{declaration}, %args );
         }
         if (my $default = $members->{default}) {
             local @nesting = (@nesting,
                               $default->{name}->{content});
-            _serializer_nested_enums( $cb, $default->{declaration} );
+            _serializer_nested_enums( $cb, $default->{declaration}, %args );
         }
 
         return;
@@ -1126,13 +1133,13 @@ sub _serializer_nested_enums {
         my $members = $decl->{members};
         for my $member (@{ $members }) {
             local @nesting = (@nesting, $member->{name}->{content});
-            _serializer_nested_enums( $cb, $member->{declaration} );
+            _serializer_nested_enums( $cb, $member->{declaration}, %args );
         }
 
         return;
     }
     elsif ($node->{type}->{spec} eq 'enum') {
-        $cb->( $node, _define_enum( $node ), type => 'enum' );
+        $cb->( $node, _define_enum( $node ), type => 'enum', %args{transform} );
         return;
     }
 
@@ -1151,11 +1158,11 @@ sub _iterate_toplevel_nodes {
         }
 
         if ($node->{def} eq 'const') {
-            _add_constant( $node );
+            _add_constant( $node, transform => $options{transform} );
             next if $options{exclude_constants};
 
-            $cb->( $node, _define_constant( $node ),
-                   type => 'constant' );
+            $cb->( $node, _define_constant( $node, transform => $options{transform} ),
+                   type => 'constant', transform => $options{transform} );
             next;
         }
 
@@ -1163,8 +1170,9 @@ sub _iterate_toplevel_nodes {
             next if $options{exclude_enums};
 
             local @nesting = ($node->{name}->{content});
-            $cb->( $node, _define_enum( $node->{definition} ),
-                   type => 'enum');
+            $cb->( $node, _define_enum( $node->{definition},
+                                        transform => $options{transform} ),
+                   type => 'enum', transform => $options{transform}  );
             # fall through to create serializers too
         }
         elsif (not $options{exclude_enums}
@@ -1175,13 +1183,14 @@ sub _iterate_toplevel_nodes {
             # the symbol table
 
             local @nesting = ($node->{name}->{content});
-           _serializer_nested_enums( $cb, $node->{definition} );
+            _serializer_nested_enums( $cb, $node->{definition},
+                                      transform => $options{transform} );
         }
 
-        $cb->( $node, _serializer_definition( $node ),
-               type => 'serializer');
-        $cb->( $node, _deserializer_definition( $node ),
-               type => 'deserializer');
+        $cb->( $node, _deserializer_definition( $node, transform => $options{transform} ),
+               type => 'deserializer', transform => $options{transform} );
+        $cb->( $node, _serializer_definition( $node, transform => $options{transform} ),
+               type => 'serializer', transform => $options{transform} );
     }
 
     return;
@@ -1216,7 +1225,9 @@ sub generate {
     use Config;
     use Carp qw(croak);
     SERIAL
-    $class->_iterate_toplevel_nodes( $ast, $cb, %options );
+    $class->_iterate_toplevel_nodes( $ast, $cb,
+                                     transform => sub { $_[0] },
+                                     %options );
 }
 
 
@@ -1318,6 +1329,15 @@ When C<$output> is undefined, the output is sent to STDOUT by default.
 Supported values for C<options>:
 
 =over 8
+
+=item * transform
+
+A function to transform identifiers; e.g.,
+
+   sub { $_[0] =~ s/^PREFIX_//ir }
+
+would strip C<PREFIX_> from C<PREFIX_IDENTI_FIER>, using C<IDENTI_FIER>
+in the generated code instead.
 
 =item * exclude_constants
 
