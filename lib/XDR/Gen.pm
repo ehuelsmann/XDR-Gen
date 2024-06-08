@@ -78,7 +78,7 @@ sub _var {
 
 sub _indent {
     chomp $_[0];
-    return ($_[0] =~ s/\n(?!$)/\n    /gr);
+    return ($_[0] =~ s/\n(?!\s*(\n|$))/\n    /gr);
 }
 
 sub _assert_value_var {
