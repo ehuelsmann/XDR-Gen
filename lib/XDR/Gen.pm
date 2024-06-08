@@ -376,7 +376,7 @@ sub _deserializer_float {
     return <<~SERIAL;
     # my (\$class, \$value, \$index, \$input) = \@_;
     die "The platform doesn't support IEEE-754 floats"
-        unless \$Config{d_double_style_ieee754}
+        unless \$Config{d_double_style_ieee754};
     die "Input buffer too short"
         if (\$input_length - \$_[2]) < 4;
     $value = unpack("f>", substr( \$_[3], \$_[2] ));
@@ -393,7 +393,7 @@ sub _serializer_float {
     return <<~SERIAL;
     # my (\$class, \$value, \$index, \$output) = \@_;
     die "The platform doesn't support IEEE-754 floats"
-        unless \$Config{d_double_style_ieee754}
+        unless \$Config{d_double_style_ieee754};
     croak "Missing required input 'float' value"
         unless defined $value;
     substr( \$_[3], \$_[2] ) = pack("f>", $value);
@@ -408,7 +408,7 @@ sub _deserializer_double {
     return <<~SERIAL;
     # my (\$class, \$value, \$index, \$input) = \@_;
     die "The platform doesn't support IEEE-754 floats"
-        unless \$Config{d_double_style_ieee754}
+        unless \$Config{d_double_style_ieee754};
     die "Input buffer too short"
         if (\$input_length - \$_[2]) < 8;
     $value = unpack("d>", substr( \$_[3], \$_[2] ));
@@ -425,7 +425,7 @@ sub _serializer_double {
     return <<~SERIAL;
     # my (\$class, \$value, \$index, \$output) = \@_;
     die "The platform doesn't support IEEE-754 floats"
-        unless \$Config{d_double_style_ieee754}
+        unless \$Config{d_double_style_ieee754};
     croak "Missing required input 'double' value"
         unless defined $value;
     substr( \$_[3], \$_[2] ) = pack("d>", $value);
