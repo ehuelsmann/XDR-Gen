@@ -1069,8 +1069,9 @@ sub _define_constant {
 
     my $name = $node->{name}->{content};
     my $value = $node->{value}->{content};
+    my $resolved = _resolve_to_number( $value );
     return <<~SERIAL;
-    use constant $name => $value;
+    use constant $name => $resolved; # $value
     SERIAL
 }
 
