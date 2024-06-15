@@ -1082,12 +1082,11 @@ sub _define_constant {
     SERIAL
 }
 
-our @nesting;
-
 sub _define_enum {
-    my ($node, %args) = @_;
-    my $name = $node->{name}->{content} // join('.', @nesting);
+    my ($node, $names, %args) = @_;
+    my ($name, @nesting) = @{ $names };
     my $elements = $node->{type}->{declaration}->{elements};
+    $name =  $args{transform}->( $name ) . join('.', @nesting);
 
     my @fragments = (
         "# Define elements from enum '$name'",
@@ -1105,26 +1104,27 @@ sub _define_enum {
 }
 
 sub _serializer_nested_enums {
-    my ($cb, $node, %args) = @_;
+    my ($cb, $names, $node, %args) = @_;
     my $decl = $node->{type}->{declaration};
 
     if ($node->{type}->{spec} eq 'union') {
         do { # restrict "local" scope
             my $discriminator = $decl->{discriminator};
 
-            local @nesting = (@nesting,
-                              $discriminator->{name}->{content});
-            _serializer_nested_enums( $cb, $discriminator->{declaration}, %args );
+            _serializer_nested_enums( $cb,
+                                      [ @{ $names }, $discriminator->{name}->{content} ],
+                                      $discriminator->{declaration}, %args );
         };
         my $members = $decl->{members};
         for my $case (@{ $members->{cases} }) {
-            local @nesting = (@nesting, $case->{name}->{content});
-            _serializer_nested_enums( $cb, $case->{declaration}, %args );
+            _serializer_nested_enums( $cb,
+                                      [ @{ $names }, $case->{name}->{content} ],
+                                      $case->{declaration}, %args );
         }
         if (my $default = $members->{default}) {
-            local @nesting = (@nesting,
-                              $default->{name}->{content});
-            _serializer_nested_enums( $cb, $default->{declaration}, %args );
+            _serializer_nested_enums( $cb,
+                                      [ @{ $names }, $default->{name}->{content} ],
+                                      $default->{declaration}, %args );
         }
 
         return;
@@ -1132,14 +1132,18 @@ sub _serializer_nested_enums {
     elsif ($node->{type}->{spec} eq 'struct') {
         my $members = $decl->{members};
         for my $member (@{ $members }) {
-            local @nesting = (@nesting, $member->{name}->{content});
-            _serializer_nested_enums( $cb, $member->{declaration}, %args );
+            _serializer_nested_enums( $cb,
+                                      [ @{ $names }, $member->{name}->{content} ],
+                                      $member->{declaration}, %args );
         }
 
         return;
     }
     elsif ($node->{type}->{spec} eq 'enum') {
-        $cb->( $node, _define_enum( $node ), type => 'enum', %args{transform} );
+        $cb->( $node, _define_enum( $node, %args{transform} ),
+               names => $names,
+               type  => 'enum',
+               %args{transform} );
         return;
     }
 
@@ -1169,10 +1173,13 @@ sub _iterate_toplevel_nodes {
         if ($node->{def} eq 'enum') {
             next if $options{exclude_enums};
 
-            local @nesting = ($node->{name}->{content});
-            $cb->( $node, _define_enum( $node->{definition},
-                                        transform => $options{transform} ),
-                   type => 'enum', transform => $options{transform}  );
+            $cb->( $node->{definition},
+                   _define_enum( $node->{definition},
+                                 [ $node->{name}->{content} ],
+                                 transform => $options{transform} ),
+                   names => [ $node->{name}->{content} ],
+                   type  => 'enum',
+                   transform => $options{transform}  );
             # fall through to create serializers too
         }
         elsif (not $options{exclude_enums}
@@ -1182,8 +1189,9 @@ sub _iterate_toplevel_nodes {
             # enums declared inline to push the symbols into
             # the symbol table
 
-            local @nesting = ($node->{name}->{content});
-            _serializer_nested_enums( $cb, $node->{definition},
+            _serializer_nested_enums( $cb,
+                                      [ $node->{name}->{content} ],
+                                      $node->{definition},
                                       transform => $options{transform} );
         }
 
