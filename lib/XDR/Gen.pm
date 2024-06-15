@@ -724,7 +724,7 @@ sub _deserializer_enum {
         if (\$input_length - \$_[2]) < 4;
     $value = unpack("l>", substr( \$_[3], \$_[2] ) );
     die "Out of range enum value supplied: $value"
-        unless vec(state $state_var = unpack('H*', '$allowed_hex'),
+        unless vec(state $state_var = pack('H*', '$allowed_hex'),
                    $value, 1);
     \$_[2] += 4;
     SERIAL
@@ -741,7 +741,7 @@ sub _serializer_enum {
     croak "Missing required input 'enum' value"
         unless defined $value;
     die "Out of range enum value: $value"
-        unless vec(state $state_var = unpack('H*', '$allowed_hex'),
+        unless vec(state $state_var = pack('H*', '$allowed_hex'),
                    $value, 1);
     substr( \$_[3], \$_[2] ) = pack("l>", $value);
     \$_[2] += 4;
