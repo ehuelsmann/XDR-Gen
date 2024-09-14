@@ -779,7 +779,7 @@ sub _serializer_struct {
         push @fragments, "# Serializing field: '$name'";
         push @fragments, qq|croak "Missing required input value '$name'"|;
         # existance check, not definedness: "pointer"-type values may be 'undef'
-        push @fragments, qq|    unless exists ${value}->{$name}|;
+        push @fragments, qq|    unless exists ${value}->{$name};|;
         push @fragments, _serializer_declaration(
             $member->{declaration},
             $name ? $value . "->{$name}" : undef,
