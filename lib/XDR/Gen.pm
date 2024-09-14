@@ -603,8 +603,6 @@ sub _serializer_named {
 
     return <<~SERIAL;
     # my (\$class, \$value, \$index, \$output) = \@_;
-    croak "Missing required input '$ref' value"
-        unless defined $value;
     \$_[0]->serialize_$ref( $value, \$_[2], \$_[3] );
     SERIAL
 }
@@ -779,6 +777,9 @@ sub _serializer_struct {
     for my $member (@{ $decl->{members} }) {
         my $name = $member->{name}->{content};
         push @fragments, "# Serializing field: '$name'";
+        push @fragments, qq|croak "Missing required input value '$name'|;
+        # existance check, not definedness: "pointer"-type values may be 'undef'
+        push @fragments, qq|    unless exists ${value}->{$name}|;
         push @fragments, _serializer_declaration(
             $member->{declaration},
             $name ? $value . "->{$name}" : undef,
